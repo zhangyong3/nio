@@ -1,15 +1,22 @@
 #include <unistd.h>
 #include <sys/epoll.h>
+#include <sys/time.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
 #include "session.h"
 #include "tcpserver.h"
 
+static uint64_t currentTimeMillis()
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return 1000*(uint64_t)tv.tv_sec+ tv.tv_usec/1000;
+}
 
 
 Session::Session()
-	:fd(-1),thread(NULL)
+	:fd(-1), thread(NULL), lastActiveTime(0)
 {
 	state = CLOSED;
 }
@@ -26,6 +33,7 @@ void Session::reset()
 	thread = NULL;
 	rBuf.clear();
 	wBuf.clear();
+	lastActiveTime = 0;
 }
 
 void Session::onOpened()
@@ -44,8 +52,9 @@ void Session::onClosed()
 {
 }
 
-void Session::onIdle()
+bool Session::onIdle()
 {
+	return true;
 }
 
 void Session::onError(int errcode)
@@ -143,6 +152,11 @@ void WorkThread::run()
 					ev.events = EPOLLIN;
 					ev.data.ptr = new_session;
 					epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);
+
+					if (sessFactory->getSessionTimeout() != -1) {
+						new_session->lastActiveTime = currentTimeMillis();
+						sessions.insertRear(new_session);
+					}
 				}
 			} else {
 				char buf[1024];
@@ -157,10 +171,7 @@ void WorkThread::run()
 							sess->onError(errno);
 						}
 
-						ev.events = EPOLLIN|EPOLLOUT;
-						ev.data.ptr = sess;
-						epoll_ctl(epfd, EPOLL_CTL_DEL, sess->fd, &ev);
-
+						sess->close();
 						sessFactory->releaseSession(sess);
 						continue;
 					} else {
@@ -176,6 +187,12 @@ void WorkThread::run()
 							}
 
 							packFactory->releasePacket(pack);
+						}
+
+						if (sessFactory->getSessionTimeout() != -1) {
+							sessions.deleteNode(sess);
+							sess->lastActiveTime = currentTimeMillis();
+							sessions.insertRear(sess);
 						}
 					}
 
@@ -195,6 +212,26 @@ void WorkThread::run()
 					ev.data.ptr = sess;
 					epoll_ctl(epfd, EPOLL_CTL_MOD, sess->fd, &ev);
 					sess->state = Session::READ;
+				}
+			}
+		}
+
+		if (sessFactory->getSessionTimeout() != -1) {
+			uint64_t deadLine = currentTimeMillis() - sessFactory->getSessionTimeout();
+			Session *sess = (Session*)sessions.getHead();
+			while (sess != NULL) {
+				if (sess->lastActiveTime > deadLine)
+					break;
+
+				if (!sess->onIdle()) {
+					Session *p = (Session*)sess->getNext();
+					sessions.deleteNode(sess);
+					sess->close();
+					sessFactory->releaseSession(sess);
+					sess = p;
+				} else {
+					sess->lastActiveTime = currentTimeMillis();
+					sess = (Session*)sess->getNext();
 				}
 			}
 		}

@@ -3,11 +3,13 @@
 
 #include "packet.h"
 #include <stdio.h>
+#include <stdint.h>
 #include "bytebuffer.h"
 #include "thread.h"
+#include "linkedlist.h"
 
 class WorkThread;
-class Session
+class Session : public Node
 {
 public:
 	typedef enum {CLOSED, READ, WRITE} State;
@@ -21,7 +23,9 @@ public:
 	virtual void onOpened();
 	virtual void onMessageReceived(Packet *packet);
 	virtual void onClosed();
-	virtual void onIdle();
+
+	//return true to persist, false to close
+	virtual bool onIdle();
 	virtual void onError(int errcode);
 	virtual void onMessageParseError(Packet *packet);
 
@@ -32,6 +36,7 @@ public:
 	void write(const char *data, int dataLen);
 
 protected:
+	uint64_t lastActiveTime;
 	State state;
 	int fd;
 
@@ -47,6 +52,7 @@ class SessionFactory
 public:
 	virtual Session *createSession() = 0;
 	virtual void releaseSession(Session *sess) = 0;
+	virtual int getSessionTimeout() { return -1; }
 };
 
 class PacketFactory
@@ -72,6 +78,8 @@ protected:
 	PacketFactory *packFactory;
 	int pfd[2];
 	int epfd;
+
+	LinkedList sessions;
 
 	friend class TcpServer;
 	friend class Session;

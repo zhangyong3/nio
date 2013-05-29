@@ -1,4 +1,4 @@
-OBJ=thread.o tcpserver.o bytebuffer.o session.o 
+OBJ=thread.o tcpserver.o bytebuffer.o session.o linkedlist.o
 CC=g++ -g
 LIB=-lpthread
 
