@@ -62,6 +62,12 @@ public:
 	{
 		printf("closed\n");
 	}
+
+	bool onIdle()
+	{
+		printf("idle\n");
+		return false;
+	}
 };
 
 
@@ -76,6 +82,11 @@ public:
 	void releaseSession(Session *sess)
 	{
 		delete sess;
+	}
+
+	int getSessionTimeout()
+	{
+		return 5000;
 	}
 };
 
