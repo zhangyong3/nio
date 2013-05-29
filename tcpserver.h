@@ -35,7 +35,7 @@ protected:
 	int epfd;
 
 public:
-	static bool running;
+	static volatile bool running;
 };
 
 #endif
