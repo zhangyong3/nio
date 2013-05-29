@@ -1,6 +1,11 @@
 CC=g++ -g
-LIB=../thread.o -pthread
+LIB=-lnio -pthread -L../
 INC=-I../
+
+all : echoserver loadtest
+
+echoserver: echo.o
+	$(CC) -o $@ $^ $(LIB)
 
 loadtest: loadtest.o
 	$(CC) -o $@ $^ $(LIB)
@@ -9,4 +14,4 @@ loadtest: loadtest.o
 	$(CC) -c $< $(INC)
 
 clean:
-	rm -rf loadtest.o loadtest
+	rm -rf *.o loadtest echoserver
