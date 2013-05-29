@@ -111,7 +111,7 @@ int ByteBuffer::leftSize() const
 
 void ByteBuffer::shrink()
 {
-	const int threshold = 8;
+	const int threshold = 1024;
 	if (curPos > threshold) {
 		memmove(buf, buf+curPos, endPos-curPos);
 		endPos -= curPos;
