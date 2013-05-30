@@ -91,7 +91,7 @@ void TcpServer::openSocket()
 			continue;
 		}
 
-		if (listen(fd, 16) != 0) {
+		if (listen(fd, 2048) != 0) {
 			perror("listen");
 			close(fd);
 			continue;
