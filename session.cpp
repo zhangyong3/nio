@@ -116,7 +116,7 @@ void WorkThread::run()
 	const int MAX_EVENTS = 128;
 	struct epoll_event events[MAX_EVENTS];
 	while (TcpServer::running) {
-		int n =  epoll_wait(epfd, events, MAX_EVENTS, 1);
+		int n =  epoll_wait(epfd, events, MAX_EVENTS, 100);
 		if (n == -1) {
 			perror("epoll_pwait");
 			continue;
