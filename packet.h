@@ -6,9 +6,11 @@
 class Packet
 {
 public:
-	static const int PARSE_OK = 0;
-	static const int PARSE_FAILURE = -1;
-	static const int PARSE_NEED_MORE_DATA = -2;
+	enum {
+		PARSE_OK = 0,
+		PARSE_FAILURE = -1,
+		PARSE_NEED_MORE_DATA = -2,
+	};
 
 public:
 	Packet() {}
