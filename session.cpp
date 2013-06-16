@@ -6,6 +6,7 @@
 #include <string.h>
 #include "session.h"
 #include "tcpserver.h"
+#include <list>
 
 static uint64_t currentTimeMillis()
 {
@@ -18,7 +19,6 @@ static uint64_t currentTimeMillis()
 Session::Session()
 	:fd(-1), thread(NULL), lastActiveTime(0)
 {
-	state = CLOSED;
 }
 
 
@@ -66,11 +66,11 @@ void Session::close()
 	if (fd != -1) {
 		if (thread != NULL) {
 			thread->close(this);
+			thread->deadSessions.push_back(this);
 		}
 
 		::close(fd);
 		fd = -1;
-		state = CLOSED;
 	}
 }
 
@@ -144,7 +144,6 @@ void WorkThread::run()
 					::close(fd);
 				} else {
 					new_session->fd = fd;
-					new_session->state = Session::READ;
 					new_session->thread = this;
 
 					new_session->onOpened();
@@ -162,17 +161,17 @@ void WorkThread::run()
 				char buf[1024];
 				int sz = 0;
 				Session *sess = (Session*)events[i].data.ptr;
-				if (sess->getState() == Session::READ) {
+				if (events[i].events & EPOLLIN) {
 					sz = read(sess->fd, buf, sizeof(buf));
 					if (sz <= 0) {
 						if (sz == 0) {
+
 							sess->onClosed();
 						} else if (sz == -1 && errno != EINTR) {
 							sess->onError(errno);
 						}
 
 						sess->close();
-						sessFactory->releaseSession(sess);
 						continue;
 					} else {
 						sess->rBuf.append(buf, sz);
@@ -200,9 +199,8 @@ void WorkThread::run()
 						ev.events = EPOLLOUT;
 						ev.data.ptr = sess;
 						epoll_ctl(epfd, EPOLL_CTL_MOD, sess->fd, &ev);
-						sess->state = Session::WRITE;
 					}
-				} else if (sess->getState() == Session::WRITE) {
+				} else if (events[i].events & EPOLLOUT) {
 					while ( (sz = sess->wBuf.read(buf, sizeof(buf))) > 0) {
 						write(sess->fd, buf, sz);
 					}
@@ -211,7 +209,6 @@ void WorkThread::run()
 					ev.events = EPOLLIN;
 					ev.data.ptr = sess;
 					epoll_ctl(epfd, EPOLL_CTL_MOD, sess->fd, &ev);
-					sess->state = Session::READ;
 				}
 			}
 		}
@@ -225,15 +222,24 @@ void WorkThread::run()
 
 				if (!sess->onIdle()) {
 					Session *p = (Session*)sess->getNext();
-					sessions.deleteNode(sess);
 					sess->close();
-					sessFactory->releaseSession(sess);
 					sess = p;
 				} else {
 					sess->lastActiveTime = currentTimeMillis();
 					sess = (Session*)sess->getNext();
 				}
 			}
+		}
+
+
+		while (deadSessions.size() > 0) {
+			Session *sess = *deadSessions.begin();
+			deadSessions.pop_front();
+
+			if (sessFactory->getSessionTimeout() != -1) {
+				sessions.deleteNode(sess);
+			}
+			sessFactory->releaseSession(sess);
 		}
 	}
 }

@@ -7,13 +7,11 @@
 #include "bytebuffer.h"
 #include "thread.h"
 #include "linkedlist.h"
+#include <list>
 
 class WorkThread;
 class Session : public Node
 {
-public:
-	typedef enum {CLOSED, READ, WRITE} State;
-
 public:
 	Session();
 	virtual ~Session();
@@ -29,15 +27,11 @@ public:
 	virtual void onError(int errcode);
 	virtual void onMessageParseError(Packet *packet);
 
-	Session::State getState() {return state;}
-	void setState(Session::State stat) { state = stat; }
-
 	void close();
 	void write(const char *data, int dataLen);
 
 protected:
 	uint64_t lastActiveTime;
-	State state;
 	int fd;
 
 	ByteBuffer rBuf;
@@ -80,6 +74,7 @@ protected:
 	int epfd;
 
 	LinkedList sessions;
+	std::list<Session*> deadSessions;
 
 	friend class TcpServer;
 	friend class Session;
