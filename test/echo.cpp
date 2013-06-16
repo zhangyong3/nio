@@ -1,6 +1,8 @@
 #include "tcpserver.h"
 #include "packet.h"
 #include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <iostream>
 
 
@@ -51,10 +53,21 @@ protected:
 class EchoSession : public Session
 {
 public:
+	void onOpened()
+	{
+		printf("opened\n");
+	}
+
+	void onError(int errcode)
+	{
+		printf("on error: %d\n", errcode);
+	}
+
 	void onMessageReceived(Packet *pack)
 	{
 		EchoPacket *p = (EchoPacket*)pack;
 		std::string s = p->getValue();
+		usleep(rand()%10000);
 		write(s.c_str(), s.length());
 	}
 
@@ -86,6 +99,7 @@ public:
 
 	int getSessionTimeout()
 	{
+		//return -1;
 		return 5000;
 	}
 };
